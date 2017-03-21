@@ -1,0 +1,3 @@
+https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx480412b052be4bac&redirect_uri=http%3a%2f%2fg.grainwatch.cn%2findex.html&response_type=code&scope=snsapi_base&state=123#wechat_redirect
+
+http://g.grainwatch.cn/index.html?code=021Djw2i0Bux0B1eKE5i0ADp2i0Djw2F&state=123

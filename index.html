@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html style="font-size: 100px">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <script type="text/javascript" src="./xsdk.js"></script>
+    <style type="text/css">
+      body {
+        font-size: 16px
+      }
+      .wrap {
+        padding: 0.1rem;
+      }
+      .header {
+        margin-top: 0.1rem;
+      }
+      .header label {
+        height: 0.3rem;
+        line-height: 0.3rem;
+        vertical-align: middle;
+      }
+      .header .devices-list {
+        height: 0.3rem;
+        vertical-align: middle;
+        width: 1rem;
+      }
+      .body {
+        margin-top: 0.1rem;
+        border: 1px solid #D9D9D9;
+        padding: 0.1rem;
+        position: relative;
+        display: none;
+      }
+      .body .data-type-select .data-type {
+        height: 0.3rem;
+        vertical-align: middle;
+        width: 1.2rem;
+      }
+      .body .data-type-select:after {
+        clear: both;
+        content: '';
+        display: block;
+      }
+      .device-info {
+        margin-top: 0.1rem
+      }
+      .datapoint-panel {
+        display: none
+      }
+      .dp-table {
+        border: 1px solid #D9D9D9;
+      }
+      .dp-table td, th {
+        border: 1px solid #D9D9D9;
+        padding: 0.05rem 0.1rem
+      }
+      .dp-table td input {
+        width: 1rem;
+      }
+      .pipe-panel {
+        display: none
+      }
+      .pipe-panel .send input, button {
+        height: 0.25rem;
+        vertical-align: middle;
+      }
+      .datapoint-panel .send {
+        margin-top: 0.1rem
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div class="wrap">
+      <div class="header">
+        <label>选择设备:</label>
+        <select class="devices-list">
+          <option value ="0">选择设备</option>
+        </select>
+      </div>
+      <div class="body">
+        <div class="data-type-select">
+          <select class="data-type">
+            <option value ="0">选择数据类型</option>
+            <option value ="1">数据端点</option>
+            <option value ="2">透传</option>
+          </select>
+        </div>
+        <div class="device-info">
+          <div class="datapoint-panel">
+            <table class="dp-table" cellspacing="0">
+              <thead>
+                <tr>
+                  <th>index(索引)</th>
+                  <th>value(值)</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+            <div class="send">
+              <button name="">发送</button>
+            </div>
+          </div>
+          <div class="pipe-panel">
+            <div class="send">
+              <input type="text" placeholder="16进制数组 0~0xFF 空格分隔" />
+              <button name="">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      var XLINKAPPID = '2e0fa6b13b248a00'//云智易微信应用appID ,非微信appID
+      var APIROOT = 'http://wx.xlink.cn' // RESTful接口域名
+      var uiDevices = {}
+      var currentUiDevice
+      var ui = {
+        init: function () {
+          this._bindDeviceSelectEvents()
+          this._bindDataTypeSelectEvents()
+          this._bindDatapointSend()
+          this._bindPipeSend()
+        },
+        renderDeviceList: function (list) {
+          var self = this
+          var deviceSelectDom = document.querySelector('.devices-list')
+          for (var i in list) {
+            var optionDom = self._createDeviceOption(list[i])
+            if (optionDom) {
+              deviceSelectDom.appendChild(optionDom)
+            }
+          }
+        },
+        createDatapoints: function (datapoints) {
+          if (!datapoints) {
+            return
+          }
+          this._clearDatapoints()
+          var tableDom = document.querySelector('.dp-table tbody')
+          for (var i = 0; i < datapoints.length; i++) {
+            var dpFragment = this._createDatapointTr(datapoints[i])
+            if (dpFragment) {
+              tableDom.appendChild(dpFragment)
+            }
+          }
+        },
+        updateDatapoints: function (datapoints) {
+          var self = this
+          if (datapoints && datapoints.length) {
+            datapoints.forEach(function (datapoint) {
+              var inputDom = document.querySelector('.' + self._createDpValueDomClassName(datapoint.index))
+              if (inputDom) {
+                inputDom.value = datapoint.value
+              }
+            })
+          }
+        },
+        setPipeValue: function (arr) {
+          if (!arr || !Array.isArray(arr)) {
+            return
+          }
+          var hexArr = []
+          arr.forEach(function (item) {
+            hexArr.push(Number(item).toString(16))
+          })
+          var val = hexArr.join(' ')
+          var pipeDom = document.querySelector('.pipe-panel input')
+          if (pipeDom) {
+            pipeDom.value = val
+          }
+        },
+        _createDatapointTr: function (datapoint) {
+          var trDom = document.createElement('tr')
+          var tdIndexDom = document.createElement('td')
+          var tdValueDom = document.createElement('td')
+          var indexDom = document.createElement('input')
+          indexDom.type = 'text'
+          indexDom.className = this._createDpValueDomClassName(datapoint.index)
+          indexDom.value = datapoint.value
+          tdIndexDom.innerHTML = datapoint.index
+          tdValueDom.appendChild(indexDom)
+          trDom.appendChild(tdIndexDom)
+          trDom.appendChild(tdValueDom)
+          return trDom
+        },
+        _createDpValueDomClassName: function (index) {
+          return 'tr-value-' + index
+        },
+        _clearDatapoints: function () {
+          var tableDom = document.querySelector('.dp-table tbody')
+          tableDom.innerHTML = ''
+        },
+        _bindPipeSend: function () {
+          var self = this
+          var dpSendDom = document.querySelector('.pipe-panel .send button')
+          dpSendDom.addEventListener('click', function (event) {  // 设备选择
+            var pipeValue = document.querySelector('.pipe-panel .send input')
+            var values = pipeValue.value.split(' ')
+            var pipeDatas = []
+            for (var i in values) {
+              pipeDatas.push(parseInt(values[i], 16))
+            }
+            httpWS.sendDevicePipe(pipeDatas)
+          })
+        },
+        _bindDatapointSend: function () {
+          var self = this
+          var dpSendDom = document.querySelector('.datapoint-panel .send')
+          dpSendDom.addEventListener('click', function (event) {  // 设备选择
+            var allDatapointDoms = document.querySelectorAll('.dp-table tbody tr')
+
+            var length = allDatapointDoms.length
+            if (!length) {
+              return
+            }
+            var indexValues = []
+            for (var i = 0; i < length; i++) {
+              var tds = allDatapointDoms[i].querySelectorAll('td')
+              if (tds[1]) {
+                var inputDom = tds[1].querySelector('input')
+              }
+
+              if (tds[0] && inputDom) {
+                var value = Number(inputDom.value)
+                if (isNaN(value)) {
+                  value = inputDom.value
+                  if (value === 'false') {
+                    value = false
+                  } else if (value === 'true') {
+                    value = true
+                  }
+                }
+                indexValues.push({
+                  index: parseInt(tds[0].innerHTML),
+                  value: value
+                })
+              }
+            }
+            httpWS.sendDeviceDataPoint(indexValues)
+          })
+        },
+        _bindDeviceSelectEvents: function () {
+          var self = this
+          var selectDeviceDom = document.querySelector('.devices-list')
+          selectDeviceDom.addEventListener('change', function (event) {  // 设备选择
+            if (selectDeviceDom.value !== '0') {
+              currentUiDevice = uiDevices[selectDeviceDom.value]
+              if (!currentUiDevice.isListened) {
+                httpWS.bindDeviceEvents(currentUiDevice.socket)
+              }
+              self._triggleDeviceInfoPanel(true)
+            } else {
+              self._triggleDeviceInfoPanel(false)
+            }
+            self._triggleDatapointPanel(false)
+            self._trigglePipePanel(false)
+            self._setDefaultDataType()
+            self._emptyPipeInput()
+
+            // 获取当前设备的数据端点
+            httpWS.getDatapoints()
+          })
+        },
+        _bindDataTypeSelectEvents: function () {
+          var self = this
+          var selectTypeDom = document.querySelector('.data-type')
+          selectTypeDom.addEventListener('change', function (event) { // 数据类型选择
+            if (selectTypeDom.value === "1") {
+              self._triggleDatapointPanel(true)
+              self._trigglePipePanel(false)
+            } else if (selectTypeDom.value === "2") {
+              self._triggleDatapointPanel(false)
+              self._trigglePipePanel(true)
+            } else {
+              self._triggleDatapointPanel(false)
+              self._trigglePipePanel(false)
+            }
+          })
+        },
+        _setDefaultDataType: function () {
+          var dataTypeSelectDom = document.querySelector('.data-type')
+          if (dataTypeSelectDom) {
+            dataTypeSelectDom.value = 0
+          }
+        },
+        _emptyPipeInput: function () {
+          var pipeDom = document.querySelector('.pipe-panel input')
+          if (pipeDom) {
+            pipeDom.value = ''
+          }
+        },
+        _createDeviceOption: function (uiDevice) {
+          if (!uiDevice) return
+          var optionDom = document.createElement('option')
+          optionDom.value = uiDevice.id
+          optionDom.innerHTML = uiDevice.mac || uiDevice.id
+          return optionDom
+        },
+        _triggleDeviceInfoPanel: function (show) {
+          var panel = document.querySelector('.body')
+          if (show) {
+            panel.style.display = "block"
+          } else {
+            panel.style.display = "none"
+          }
+        },
+        _triggleDatapointPanel: function (show) {
+          var panel = document.querySelector('.datapoint-panel')
+          if (show) {
+            panel.style.display = "block"
+          } else {
+            panel.style.display = "none"
+          }
+        },
+        _trigglePipePanel: function (show) {
+          var panel = document.querySelector('.pipe-panel')
+          if (show) {
+            panel.style.display = "block"
+          } else {
+            panel.style.display = "none"
+          }
+        }
+      }
+
+      var httpWS = {
+        user_id: '',
+        authorize: '',
+        open_id: '',
+        init: function () {
+          this._getOpenId(this._getSearchCode())
+        },
+        getDatapoints: function () {
+          if (!currentUiDevice.socket) {
+            return
+          }
+          currentUiDevice.socket.emit('probe', function (res) {
+            if (res.status === 0) { // 获取成功
+              ui.createDatapoints(res.data)
+            } else if (res.status === 10) {
+              console.log(res.msg) // 设备离线
+            } else {
+              console.log(res)
+            }
+          })
+        },
+        bindDeviceEvents: function (socket) {
+          if (!socket) {
+            throw new Error('no socket binded')
+          }
+          socket.on('data', function (data) {
+            if (currentUiDevice.socket.id !== socket.id) { // 如果不是当前选择的设备上报数据，不显示在页面
+              return
+            }
+            if (data.type === 'datapoint') {
+              ui.updateDatapoints(data.data)
+            } else if (data.type === 'pipe' || data.type === 'pipe_sync') {
+              ui.setPipeValue(data.data)
+            }
+          }).on('statuschange', function (status) {
+            // status=1 表示设备在线，status=0表示设备离线
+            if (status === 0) {
+              console.log('device: ' + socket.id + ' is offline')
+            } else if (status === 1) {
+              console.log('device: ' + socket.id + ' is online')
+            }
+          })
+          currentUiDevice.isListened = true
+        },
+        sendDevicePipe: function (pipeDatas) {
+          if (!currentUiDevice.socket) {
+            return
+          }
+          currentUiDevice.socket.emit('senddata', {
+            type: 'pipe',
+            data: pipeDatas
+          }, function (res) {
+            if (res.status === 0) {
+              console.log('send success')
+            } else if (res.status === 10) { // 设备离线
+              console.log(res.msg)
+            } else {
+              console.log(res)
+            }
+          })
+        },
+        sendDeviceDataPoint: function (datapoints) {
+          if (!currentUiDevice.socket) {
+            return
+          }
+          currentUiDevice.socket.emit('senddata', {
+            type: 'datapoint',
+            data: datapoints
+          }, function (res) {
+            if (res.status === 0) {
+              console.log('send success')
+            } else if (res.status === 10) { // 离线
+              console.log(res.msg)
+            } else {
+              console.log(res)
+            }
+          })
+        },
+        _getSearchCode: function () { // 获取url上的code参数
+          var search = location.search
+          var searchs = {}, strs
+          if (search.indexOf('?') != -1) {
+            search = search.substr(1)
+            strs = search.split('&')
+            for (var i = 0; i < strs.length; i++) {
+              searchs[strs[i].split("=")[0]] = decodeURIComponent(strs[i].split("=")[1]);
+            }
+          }
+
+          return searchs['code']
+        },
+        _initWS: function (addDevicesParams) {
+          var self = this
+          var ws = new XSDK('websocket', {
+            host: 'http://cm.xlink.cn:23777',
+            userid: self.user_id,
+            authorize: self.authorize,
+            dp_version: 2
+          })
+
+          ws.on('ready', function () {
+            ws.emit('adddevices', addDevicesParams)
+          }).on('devicesready', function (sockets) {
+            sockets.forEach(function (socket) {
+              uiDevices[socket.id].socket = socket
+            })
+            ui.renderDeviceList(uiDevices)
+          })
+        },
+        _getOpenId: function (code) {
+          var self = this
+          var openIdUrl = APIROOT + '/v2/wechat_gateway/' + XLINKAPPID + '/get_open_id?code=' + code
+          this.ajax('GET', openIdUrl, function (response) {
+            resObj = JSON.parse(response)
+            self.user_id = resObj['user_id']
+            self.open_id = resObj['open_id']
+            self._getUserAuthorize()
+          })
+        },
+        _getUserAuthorize: function () {
+          var self = this
+          var userAuthorizeUrl = APIROOT + '/v2/wechat_gateway/' + XLINKAPPID + '/wx_access_token?open_id=' + self.open_id + '&resource=wechat'
+          this.ajax('GET', userAuthorizeUrl, function (response) {
+            resObj = JSON.parse(response)
+            self.authorize = resObj['authorize']
+            self._getDevices()
+          })
+        },
+        _getDevices: function () {
+          var self = this
+          var devicesUrl = APIROOT + '/v2/wechat_gateway/' + XLINKAPPID + '/wx_device_list?access_token=XLINKUserAccessToken&open_id=' + self.open_id
+          this.ajax('GET', devicesUrl, function (response) {
+            resObj = JSON.parse(response)
+            resObj.devices.forEach(function (item) {
+              uiDevices[item.device_id] = {
+                id: item.device_id,
+                mac: item.device_mac,
+                pid: item.device_pid,
+                device_type: item.device_type
+              }
+            })
+            self._initWS(resObj.devices)
+          })
+        },
+        ajax: function (method, url, callback) {
+          var xmlHttp = new XMLHttpRequest()
+          xmlHttp.onreadystatechange = function () {
+            if(xmlHttp.readyState === 4) {
+              if(xmlHttp.status === 200) {
+                callback(xmlHttp.responseText)
+              }
+            }
+          }
+          xmlHttp.open(method, url, true)
+          xmlHttp.send()
+        }
+      }
+
+      ui.init()
+      httpWS.init()
+    </script>
+  </body>
+</html>
