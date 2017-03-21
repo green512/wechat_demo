@@ -1,3 +1,8 @@
+
+https://page-test.xlink.cn/100fa6b0f136a800/index.html
+
+https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx480412b052be4bac&redirect_uri=https%3A%2F%2Fpage-test.xlink.cn%2F100fa6b0f136a800%2Findex.html&response_type=code&scope=snsapi_base&state=123#wechat_redirect
+
 https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx480412b052be4bac&redirect_uri=http%3a%2f%2fg.grainwatch.cn%2findex.html&response_type=code&scope=snsapi_base&state=123#wechat_redirect
 
 http://g.grainwatch.cn/index.html?code=021Djw2i0Bux0B1eKE5i0ADp2i0Djw2F&state=123
