@@ -108,6 +108,11 @@
               <button name="">发送</button>
             </div>
           </div>
+		  <div class="direct-panel">
+            <div class="send">
+                <button name="">打开</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -116,12 +121,14 @@
       var APIROOT = 'http://wx.xlink.cn' // RESTful接口域名
       var uiDevices = {}
       var currentUiDevice
+	  var cState =false
       var ui = {
         init: function () {
           this._bindDeviceSelectEvents()
           this._bindDataTypeSelectEvents()
           this._bindDatapointSend()
           this._bindPipeSend()
+		  this._bindDirectSend()
         },
         renderDeviceList: function (list) {
           var self = this
@@ -153,6 +160,7 @@
               var inputDom = document.querySelector('.' + self._createDpValueDomClassName(datapoint.index))
               if (inputDom) {
                 inputDom.value = datapoint.value
+				cState=datapoint.value
               }
             })
           }
@@ -239,6 +247,27 @@
               }
             }
             httpWS.sendDeviceDataPoint(indexValues)
+          })
+        },
+		_bindDirectSend: function () {
+          var self = this
+          var dpSendDom = document.querySelector('.direct-panel .send button')
+          dpSendDom.addEventListener('click', function (event) {  // 设备选择
+            var indexValues = []
+            indexValues.push({
+                  index: 0,
+                  value: !cState
+                })
+            var isSend=httpWS.sendDeviceDataPoint(indexValues)
+			if(isSend){
+				cState=!cState
+				if(cState){				
+					dpSendDom.innerText='关闭' 
+				}
+				else  {
+					dpSendDom.innerText='打开'
+				}
+			}
           })
         },
         _bindDeviceSelectEvents: function () {
@@ -387,20 +416,27 @@
         },
         sendDeviceDataPoint: function (datapoints) {
           if (!currentUiDevice.socket) {
-            return
+            return false //modify by green
           }
-          currentUiDevice.socket.emit('senddata', {
+          if (currentUiDevice.socket.emit('senddata', {
             type: 'datapoint',
             data: datapoints
           }, function (res) {
             if (res.status === 0) {
               console.log('send success')
+			  return true //add by green
             } else if (res.status === 10) { // 离线
               console.log(res.msg)
+			   return false //add by green
             } else {
               console.log(res)
+			  return false //add by green
             }
-          })
+          })){
+			  return true //add by green
+		  }else{
+			  return false //add by green
+			  }
         },
         _getSearchCode: function () { // 获取url上的code参数
           var search = location.search
