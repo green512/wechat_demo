@@ -1,2 +1,2 @@
 # wechat_demo
-wechat remote control demo
+It's a wechat demo to remote control a freahair
